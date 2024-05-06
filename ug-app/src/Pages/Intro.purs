@@ -105,7 +105,7 @@ intro { cart } = IR.ionRoute_ @{} \{ kitchens, checkout } _ -> fixed
               ( mapWithIndex
                   ( \kitchen (Data.Kitchen { slug, name, imageUrl }) -> D.div_
                       [ kitchens (pure { kitchen } :: Poll _) []
-                          [ IMG.ionImg
+                          [ D.img
                               [ DA.src_ imageUrl
                               , DA.alt_ name
                               , DA.klass_ "rounded-lg"
