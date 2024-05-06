@@ -1,0 +1,14 @@
+package:
+  name: ug-app
+  dependencies:
+    - debug
+    - deku
+    - deku-core
+    - deku-dom
+    - deku-ionic
+    - foldable-traversable
+    - nonempty
+    - numbers
+    - options
+    - untagged-union
+    - web-cssom-view

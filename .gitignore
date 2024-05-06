@@ -1,0 +1,7 @@
+.venv
+.spago
+dist
+node_modules
+output
+.psc-ide-port
+.DS_Store

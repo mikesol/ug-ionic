@@ -1,0 +1,30 @@
+{
+  "name": "ug-ionic",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build && cap sync",
+    "run:android": "vite build && cap run android",
+    "run:ios": "vite build && cap run ios"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@capacitor/cli": "^6.0.0",
+    "@ionic/cli": "^7.2.0",
+    "autoprefixer": "^10.4.19",
+    "postcss": "^8.4.38",
+    "purescript": "^0.15.15",
+    "purs-tidy": "^0.11.0",
+    "spago": "^0.93.29",
+    "tailwindcss": "^3.4.3",
+    "vite": "^5.2.10"
+  },
+  "dependencies": {
+    "@capacitor/android": "^6.0.0",
+    "@capacitor/ios": "^6.0.0"
+  }
+}

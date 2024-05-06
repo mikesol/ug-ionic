@@ -1,0 +1,25 @@
+@import "tailwindcss/base";
+@import "tailwindcss/components";
+@import "tailwindcss/utilities";
+
+:root {
+  --ion-color-ugmain: #f9bc44;
+  --ion-color-ugmain-rgb: 249, 188, 68;
+  --ion-color-ugmain-contrast: #000000;
+  --ion-color-ugmain-contrast-rgb: 0, 0, 0;
+  --ion-color-ugmain-shade: #dba53c;
+  --ion-color-ugmain-tint: #fac357;
+}
+
+.ion-color-ugmain {
+  --ion-color-base: var(--ion-color-ugmain);
+  --ion-color-base-rgb: var(--ion-color-ugmain-rgb);
+  --ion-color-contrast: var(--ion-color-ugmain-contrast);
+  --ion-color-contrast-rgb: var(--ion-color-ugmain-contrast-rgb);
+  --ion-color-shade: var(--ion-color-ugmain-shade);
+  --ion-color-tint: var(--ion-color-ugmain-tint);
+}
+
+.ion-kitchen-modal {
+  --height: 90%;
+}
