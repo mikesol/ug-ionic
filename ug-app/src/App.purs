@@ -21,7 +21,6 @@ app polls = do
   rtr <- IR.ionRouter
     [ IR.useHash_ false
     , IR.ionRouteDidChange_ \_ -> do
-        log "Hi!"
         polls.setRouteChanged unit
     , Self.selfT_ \(r :: IR.IonRouter) -> do
         polls.setRouter (Just r)
