@@ -41,6 +41,7 @@ import Deku.Ionic.Enums as E
 import Deku.Ionic.Footer as IF
 import Deku.Ionic.Header as IH
 import Deku.Ionic.Icon as IIc
+import Deku.Ionic.Img as IMG
 import Deku.Ionic.Modal as IM
 import Deku.Ionic.Router as IR
 import Deku.Ionic.Select as IS
@@ -193,7 +194,7 @@ topSlide ps n (Data.Kitchen { headerUrl }) =
         )
     ]
     [ D.div [ DA.klass_ "grid grid-cols-1 place-items-center w-full h-full" ]
-        [ D.div [ DA.klass_ "w-16" ] [ D.img [ DA.src_ headerUrl ] [] ] ]
+        [ D.div [ DA.klass_ "w-16" ] [ IMG.ionImg [ DA.src_ headerUrl ] [] ] ]
     ]
 
 mainSlide :: _ -> Data.Kitchen -> Nut
@@ -206,7 +207,7 @@ mainSlide { cart, setCart, routeChanged } k = Deku.do
   NAE.fromArray kitchen.menus # maybe (D.div__ "The restaurant is now closed") \menus -> D.div
     [ DA.klass_ "swiper-slide overflow-y-scroll" ]
     [ D.div_
-        [ D.img
+        [ IMG.ionImg
             [ DA.src_ kitchen.imageUrl
             , DA.alt_ "Banner Image"
             , DA.klass_ "w-full h-48 object-cover"
@@ -377,7 +378,7 @@ renderItem
               ]
           , D.div
               [ DA.klass_ "w-1/3" ]
-              [ imageUrl # maybe mempty \url -> D.img
+              [ imageUrl # maybe mempty \url -> IMG.ionImg
                   [ DA.src_ url
                   , DA.alt_ title
                   , DA.klass_ "rounded-lg"
@@ -432,7 +433,7 @@ makeModal { item, cart, setCart } = Deku.do
          ) ->
           D.div [ DA.klass_ "flex flex-col h-[90%]" ]
             [ D.div_
-                [ imageUrl # maybe mempty \url -> D.img
+                [ imageUrl # maybe mempty \url -> IMG.ionImg
                     [ DA.src_ url
                     , DA.alt_ title
                     , DA.klass_ "w-full"
@@ -440,7 +441,7 @@ makeModal { item, cart, setCart } = Deku.do
                     []
                 ]
             , D.div [ DA.klass_ "p-4 grow overflow-y-scroll" ]
-                [ D.img
+                [ IMG.ionImg
                     [ DA.src_ headerUrl
                     , DA.alt_ title
                     , DA.klass_ "w-1/4"
