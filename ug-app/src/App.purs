@@ -11,6 +11,7 @@ import Deku.Ionic.App as IA
 import Deku.Ionic.Router as IR
 import Deku.Ionic.RouterOutlet as IRO
 import Effect (Effect)
+import Effect.Console (log)
 import Pages.Checkout (checkout)
 import Pages.Intro (intro)
 import Pages.Kitchens (kitchens)
@@ -19,6 +20,9 @@ app :: _ -> Effect Nut
 app polls = do
   rtr <- IR.ionRouter
     [ IR.useHash_ false
+    , IR.ionRouteDidChange_ \_ -> do
+        log "Hi!"
+        polls.setRouteChanged unit
     , Self.selfT_ \(r :: IR.IonRouter) -> do
         polls.setRouter (Just r)
     ]
