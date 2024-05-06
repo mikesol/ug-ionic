@@ -8,7 +8,7 @@ import Cart (Cart(..), CartItem(..))
 import Components.Swiper (Swiper, activeIndex, onEvent, slideTo, swiper)
 import Components.Swiper as Swiper
 import Data as Data
-import Data.Array (fold, length, replicate, take, (..))
+import Data.Array (drop, fold, length, replicate, take, (..))
 import Data.Array as Array
 import Data.Array.NonEmpty as NAE
 import Data.Compactable (compact)
@@ -41,6 +41,7 @@ import Deku.Ionic.Enums as E
 import Deku.Ionic.Footer as IF
 import Deku.Ionic.Header as IH
 import Deku.Ionic.Icon as IIc
+import Deku.Ionic.Img as IMG
 import Deku.Ionic.Modal as IM
 import Deku.Ionic.Router as IR
 import Deku.Ionic.Select as IS
@@ -84,7 +85,7 @@ dietaryInfoToString LactoseFree = "LF"
 dietaryInfoToString GlutenFree = "GF"
 
 kitchens :: _ -> _
-kitchens { cart, setCart } = IR.ionRoute_ @{ kitchen :: Int } \{ checkout } { kitchen } -> Deku.do
+kitchens { cart, setCart, routeChanged } = IR.ionRoute_ @{ kitchen :: Int } \{ checkout } { kitchen } -> Deku.do
   setMainSlider /\ mainSlider <- useState'
   fixed
     [ IH.ionHeader_
@@ -112,7 +113,7 @@ kitchens { cart, setCart } = IR.ionRoute_ @{ kitchen :: Int } \{ checkout } { ki
             ]
 
         ]
-    , IC.ionContent_ [ swiperComponent { cart, setCart } ]
+    , IC.ionContent_ [ swiperComponent { cart, setCart, routeChanged } ]
     , IF.ionFooter
         [ IF.translucent_ true
         , Self.self_ \_ -> do
@@ -164,13 +165,13 @@ kitchens { cart, setCart } = IR.ionRoute_ @{ kitchen :: Int } \{ checkout } { ki
     ]
 
 swiperComponent :: _ -> Nut
-swiperComponent { cart, setCart } =
+swiperComponent { cart, setCart, routeChanged } =
   D.div [ DA.klass_ "w-full h-full" ]
     [ D.div
         [ DA.klass_ "swiper mainSwiper w-full h-full" ]
         [ D.div
             [ DA.klass_ "swiper-wrapper" ]
-            (map (mainSlide { cart, setCart }) (0 .. 6))
+            (NAE.toArray $ map (mainSlide { cart, setCart, routeChanged }) Data.kitchens)
         ]
     ]
 
@@ -193,12 +194,12 @@ topSlide ps n (Data.Kitchen { headerUrl }) =
         )
     ]
     [ D.div [ DA.klass_ "grid grid-cols-1 place-items-center w-full h-full" ]
-        [ D.div [ DA.klass_ "w-16" ] [ D.img [ DA.src_ headerUrl ] [] ] ]
+        [ D.div [ DA.klass_ "w-16" ] [ IMG.ionImg [ DA.src_ headerUrl ] [] ] ]
     ]
 
-mainSlide :: _ -> Int -> Nut
-mainSlide { cart, setCart } n = Deku.do
-  let Data.Kitchen kitchen = fromMaybe' (\_ -> NAE.head Data.kitchens) (NAE.index Data.kitchens n)
+mainSlide :: _ -> Data.Kitchen -> Nut
+mainSlide { cart, setCart, routeChanged } k = Deku.do
+  let Data.Kitchen kitchen = k
   setMenuIndex /\ menuIndex <- useState 0
   setMenuHeaderMap /\ menuHeaderMapElts <- useState Nothing
   menuHeaderMap <- useRant
@@ -206,7 +207,7 @@ mainSlide { cart, setCart } n = Deku.do
   NAE.fromArray kitchen.menus # maybe (D.div__ "The restaurant is now closed") \menus -> D.div
     [ DA.klass_ "swiper-slide overflow-y-scroll" ]
     [ D.div_
-        [ D.img
+        [ IMG.ionImg
             [ DA.src_ kitchen.imageUrl
             , DA.alt_ "Banner Image"
             , DA.klass_ "w-full h-48 object-cover"
@@ -263,24 +264,26 @@ mainSlide { cart, setCart } n = Deku.do
         []
     , menuIndex <#~> \mIx -> do
         let Data.Menu { sections, id: menuId } = fromMaybe' (\_ -> NAE.head menus) (NAE.index menus mIx)
+        let
+          rc = renderCategory
+            { setMenuHeaderMap
+            , headerUrl: kitchen.headerUrl
+            , kitchenId: kitchen.id
+            , kitchenName: kitchen.name
+            , menuId
+            , cart
+            , setCart
+            , routeChanged
+            }
         D.div
           [ DA.klass_ "px-4 mt-4" ]
-          ( map
-              ( renderCategory
-                  { setMenuHeaderMap
-                  , headerUrl: kitchen.headerUrl
-                  , kitchenId: kitchen.id
-                  , kitchenName: kitchen.name
-                  , menuId
-                  , cart
-                  , setCart
-                  }
-              )
-              sections
+          ( (map (rc true) (take 1 sections)) <>
+              [ routeChanged <#~> \_ -> fixed (map (rc false) (drop 1 sections))
+              ]
           )
     ]
 
-renderCategory :: _ -> Data.Section -> Nut
+renderCategory :: _ -> Boolean -> Data.Section -> Nut
 renderCategory
   { setMenuHeaderMap
   , headerUrl
@@ -289,34 +292,43 @@ renderCategory
   , kitchenName
   , cart
   , setCart
+  , routeChanged
   }
-  (Data.Section { id, title, description, items }) = D.div_
-  ( [ D.div
-        [ DA.klass_ "sticky top-0 bg-white"
-        , Self.self_ \e -> do
-            setMenuHeaderMap (Just (Tuple id e))
-        ]
-        [ D.h2
-            [ DA.klass_ "font-bold text-xl mb-1" ]
-            [ text_ title ]
-        , description # maybe mempty \d -> D.div
-            [ DA.klass_ "text-lg mb-2 text-gray-500" ]
-            [ text_ d ]
-        ]
-    -- the data source has lots of duplicates, so nub them
-    ] <> map
-      ( renderItem
-          { headerUrl
-          , kitchenId
-          , sectionId: id
-          , menuId
-          , kitchenName
-          , cart
-          , setCart
-          }
-      )
-      (Array.nubBy (compare `on` (unwrap >>> _.title)) $ resolveItems items)
-  )
+  isFirst
+  (Data.Section { id, title, description, items }) = do
+  let source = Array.nubBy (compare `on` (unwrap >>> _.title)) $ resolveItems items
+  let
+    ri = renderItem
+      { headerUrl
+      , kitchenId
+      , sectionId: id
+      , menuId
+      , kitchenName
+      , cart
+      , setCart
+      }
+  D.div_
+    ( [ D.div
+          [ DA.klass_ "sticky top-0 bg-white"
+          , Self.self_ \e -> do
+              setMenuHeaderMap (Just (Tuple id e))
+          ]
+          [ D.h2
+              [ DA.klass_ "font-bold text-xl mb-1" ]
+              [ text_ title ]
+          , description # maybe mempty \d -> D.div
+              [ DA.klass_ "text-lg mb-2 text-gray-500" ]
+              [ text_ d ]
+          ]
+      -- the data source has lots of duplicates, so nub them
+      ] <>
+        if not isFirst then map ri source
+        else
+          ( (map ri (take 3 source)) <>
+              [ routeChanged <#~> \_ -> fixed (map ri (drop 3 source))
+              ]
+          )
+    )
 
 resolveItems :: Array Data.Item -> Array MenuItemResolved
 resolveItems = compact <<< map resolveItem
@@ -366,7 +378,7 @@ renderItem
               ]
           , D.div
               [ DA.klass_ "w-1/3" ]
-              [ imageUrl # maybe mempty \url -> D.img
+              [ imageUrl # maybe mempty \url -> IMG.ionImg
                   [ DA.src_ url
                   , DA.alt_ title
                   , DA.klass_ "rounded-lg"
@@ -421,7 +433,7 @@ makeModal { item, cart, setCart } = Deku.do
          ) ->
           D.div [ DA.klass_ "flex flex-col h-[90%]" ]
             [ D.div_
-                [ imageUrl # maybe mempty \url -> D.img
+                [ imageUrl # maybe mempty \url -> IMG.ionImg
                     [ DA.src_ url
                     , DA.alt_ title
                     , DA.klass_ "w-full"
@@ -429,7 +441,7 @@ makeModal { item, cart, setCart } = Deku.do
                     []
                 ]
             , D.div [ DA.klass_ "p-4 grow overflow-y-scroll" ]
-                [ D.img
+                [ IMG.ionImg
                     [ DA.src_ headerUrl
                     , DA.alt_ title
                     , DA.klass_ "w-1/4"

@@ -24,6 +24,7 @@ import Deku.Ionic.Enums as E
 import Deku.Ionic.Footer as IF
 import Deku.Ionic.Header as IH
 import Deku.Ionic.Icon as IIc
+import Deku.Ionic.Img as IMG
 import Deku.Ionic.Item as II
 import Deku.Ionic.Label as ILa
 import Deku.Ionic.List as IL
@@ -104,7 +105,7 @@ intro { cart } = IR.ionRoute_ @{} \{ kitchens, checkout } _ -> fixed
               ( mapWithIndex
                   ( \kitchen (Data.Kitchen { slug, name, imageUrl }) -> D.div_
                       [ kitchens (pure { kitchen } :: Poll _) []
-                          [ D.img
+                          [ IMG.ionImg
                               [ DA.src_ imageUrl
                               , DA.alt_ name
                               , DA.klass_ "rounded-lg"
