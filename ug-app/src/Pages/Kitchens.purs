@@ -7,12 +7,14 @@ import Assets.SVG as SVG
 import Cart (Cart(..), CartItem(..))
 import Components.Swiper (Swiper, activeIndex, onEvent, slideTo, swiper)
 import Components.Swiper as Swiper
+import Components.VirtualScroller (virtualScroller)
 import Control.Promise (toAffE)
 import Data as Data
-import Data.Array (drop, fold, length, replicate, take, (..))
+import Data.Array (drop, fold, length, replicate, take, zipWith, (..))
 import Data.Array as Array
 import Data.Array.NonEmpty as NAE
 import Data.Compactable (compact)
+import Data.Either (Either(..))
 import Data.Foldable (for_, sum)
 import Data.Function (on)
 import Data.FunctorWithIndex (mapWithIndex)
@@ -23,16 +25,16 @@ import Data.Newtype (class Newtype, unwrap)
 import Data.Number.Format as NF
 import Data.Options ((:=))
 import Data.String as String
-import Data.Tuple (Tuple(..))
+import Data.Tuple (Tuple(..), fst, snd)
 import Data.Tuple.Nested ((/\))
 import Deku.Core (Nut, fixed, text, text_, useHot, useMailboxed, useRant, useState, useState')
 import Deku.DOM as D
 import Deku.DOM.Attributes as DA
-import Deku.DOM.Listeners (runOn, runOn_)
+import Deku.DOM.Listeners (injectElement, runOn, runOn_)
 import Deku.DOM.Listeners as DL
 import Deku.DOM.Self as Self
 import Deku.Do as Deku
-import Deku.Hooks ((<#~>))
+import Deku.Hooks (guardWith, (<#~>))
 import Deku.Ionic.BackButton as IBB
 import Deku.Ionic.Button as IB
 import Deku.Ionic.Buttons as IBS
@@ -175,7 +177,7 @@ swiperComponent { cart, setCart } =
         [ DA.klass_ "swiper mainSwiper w-full h-full" ]
         [ D.div
             [ DA.klass_ "swiper-wrapper" ]
-            (NAE.toArray $ map (mainSlide { cart, setCart }) Data.kitchens)
+            (zipWith (mainSlide { cart, setCart }) (NAE.toArray Data.kitchens) (NAE.toArray Data.flatKitchens))
         ]
     ]
 
@@ -201,14 +203,18 @@ topSlide ps n (Data.Kitchen { headerUrl }) =
         [ D.div [ DA.klass_ "w-16" ] [ D.img [ DA.src_ headerUrl ] [] ] ]
     ]
 
-mainSlide :: _ -> Data.Kitchen -> Nut
-mainSlide { cart, setCart } k = Deku.do
+mainSlide :: _ -> Data.Kitchen -> Data.FlatKitchen -> Nut
+mainSlide { cart, setCart } k fk = Deku.do
   let Data.Kitchen kitchen = k
+  let Data.Kitchen flatKitchen = fk
   setMenuIndex /\ menuIndex <- useState 0
   setMenuHeaderMap /\ menuHeaderMapElts <- useState Nothing
   menuHeaderMap <- useRant
     (Event.fold (\b -> maybe Map.empty (\(Tuple id e) -> Map.insert id e b)) Map.empty menuHeaderMapElts)
-  NAE.fromArray kitchen.menus # maybe (D.div__ "The restaurant is now closed") \menus -> D.div
+  NAE.fromArray (Array.zip kitchen.menus flatKitchen.menus) # maybe (D.div__ "The restaurant is now closed") \mm ->do
+   let menus = map fst mm
+   let flatMenus = map snd mm
+   D.div
     [ DA.klass_ "swiper-slide overflow-y-scroll" ]
     [ D.div_
         [ D.img
@@ -267,7 +273,7 @@ mainSlide { cart, setCart } k = Deku.do
         ]
         []
     , menuIndex <#~> \mIx -> do
-        let Data.Menu { sections, id: menuId } = fromMaybe' (\_ -> NAE.head menus) (NAE.index menus mIx)
+        let Data.Menu { sections, id: menuId } = fromMaybe' (\_ -> NAE.head flatMenus) (NAE.index flatMenus mIx)
         let
           rc = renderCategory
             { setMenuHeaderMap
@@ -278,13 +284,25 @@ mainSlide { cart, setCart } k = Deku.do
             , cart
             , setCart
             }
+        let
+          ri sectionId = renderItem
+            { headerUrl: kitchen.headerUrl
+            , kitchenId: kitchen.id
+            , sectionId
+            , menuId
+            , kitchenName: kitchen.name
+            , cart
+            , setCart
+            }
         D.div
-          [ DA.klass_ "px-4 mt-4" ]
-          (join $ map rc sections)
-
+          [ DA.klass_ "px-4 mt-4", injectElement \ee -> 
+                  virtualScroller ee sections case _ of
+                        Left category -> rc category
+                        Right (Tuple sectionId item) -> ri sectionId item
+          ][]
     ]
 
-renderCategory :: _ -> Data.Section -> Array Nut
+renderCategory :: _ -> Data.Section -> Nut
 renderCategory
   { setMenuHeaderMap
   , headerUrl
@@ -294,19 +312,7 @@ renderCategory
   , cart
   , setCart
   }
-  (Data.Section { id, title, description, items }) = do
-  let source = Array.nubBy (compare `on` (unwrap >>> _.title)) $ resolveItems items
-  let
-    ri = renderItem
-      { headerUrl
-      , kitchenId
-      , sectionId: id
-      , menuId
-      , kitchenName
-      , cart
-      , setCart
-      }
-  [ D.div
+  (Data.Section { id, title, description, items }) = D.div
           [ DA.klass_ "sticky top-0 bg-white"
           , Self.self_ \e -> do
               setMenuHeaderMap (Just (Tuple id e))
@@ -318,15 +324,6 @@ renderCategory
               [ DA.klass_ "text-lg mb-2 text-gray-500" ]
               [ text_ d ]
           ]
-      -- the data source has lots of duplicates, so nub them
-      ] <> map ri source
-
-resolveItems :: Array Data.Item -> Array MenuItemResolved
-resolveItems = compact <<< map resolveItem
-  where
-  resolveItem (Data.Item { id, title, description, imageUrl }) = case title of
-    Just t -> Just $ MenuItemResolved { id, title: t, description, imageUrl }
-    Nothing -> Nothing
 
 modalId kitchenId sectionId menuId itemId = "modal_" <> show kitchenId <> "_" <> show sectionId <> "_" <> show menuId
   <> "_"
@@ -334,7 +331,7 @@ modalId kitchenId sectionId menuId itemId = "modal_" <> show kitchenId <> "_" <>
 
 renderItem
   :: _
-  -> MenuItemResolved
+  -> Data.Item
   -> Nut
 renderItem
   { headerUrl
@@ -345,7 +342,7 @@ renderItem
   , cart
   , setCart
   }
-  ( MenuItemResolved
+  ( Data.Item
       { id: itemId
       , title
       , description
@@ -362,7 +359,7 @@ renderItem
               [ DA.klass_ "flex-1" ]
               [ D.h3
                   [ DA.klass_ "text-lg font-semibold" ]
-                  [ text_ title ]
+                  [ maybe mempty text_ title ]
               , description # maybe mempty \d -> D.p
                   [ DA.klass_ "text-gray-700 text-sm line-clamp-2" ]
                   [ text_ d ]
@@ -371,7 +368,7 @@ renderItem
               [ DA.klass_ "w-1/3" ]
               [ imageUrl # maybe mempty \url -> D.img
                   [ DA.src_ url
-                  , DA.alt_ title
+                  , DA.alt_ "Item Image"
                   , DA.klass_ "rounded-lg"
                   ]
                   []
@@ -392,7 +389,7 @@ renderItem
           { cart
           , setCart
           , item: ModalItem
-              { title
+              { title: fromMaybe "Today at UG" title
               , description
               , imageUrl
               , headerUrl
@@ -411,95 +408,96 @@ makeModal
 makeModal { item, cart, setCart } = Deku.do
   setModalElt /\ modalElt <- useHot Nothing
   let ModalItem { kitchenId, sectionId, menuId, itemId } = item
-  IM.ionModal
-    [ IM.initialBreakpoint_ 0.90
-    , IM.trigger_ $ modalId kitchenId sectionId menuId itemId
-    , Self.selfT_ \m -> do
-        IM.breakpoints m [ 0.0, 0.9 ]
-        setModalElt (Just m)
-    ]
-    [ item #
-        \( ModalItem
-             { title, description, imageUrl, headerUrl, kitchenName, price, kitchenId, menuId, sectionId, itemId }
-         ) ->
-          D.div [ DA.klass_ "flex flex-col h-[90%]" ]
-            [ D.div_
-                [ imageUrl # maybe mempty \url -> D.img
-                    [ DA.src_ url
-                    , DA.alt_ title
-                    , DA.klass_ "w-full"
-                    ]
-                    []
-                ]
-            , D.div [ DA.klass_ "p-4 grow overflow-y-scroll" ]
-                [ D.img
-                    [ DA.src_ headerUrl
-                    , DA.alt_ title
-                    , DA.klass_ "w-1/4"
-                    ]
-                    []
-                , D.h1
-                    [ DA.klass_ "text-2xl font-bold mt-4" ]
-                    [ text_ title ]
-                , D.div [ DA.klass_ "mt-4 text-red-500 font-semibold" ]
-                    [ text_
-                        ( "€" <> NF.toStringWith (NF.fixed 2)
-                            ( toNumber (description # maybe 600 \d -> if String.length d > 30 then 1350 else 600) /
-                                100.0
-                            )
-                        )
-                    ]
-                , description # maybe mempty \d -> D.p
-                    [ DA.klass_ "text-lg text-gray-500 mt-4" ]
-                    [ text_ d ]
-                ]
-            , Deku.do
-                setQuantity /\ quantity <- useState 1
-                D.div [ DA.klass_ "flex space-x-2 w-full p-4 bg-white" ]
-                  [ D.div
-                      [ DA.klass_ "flex items-center justify-center border-2 border-gray-300 rounded-md w-1/3"
-                      ]
-                      [ D.button
-                          [ DA.klass_ "px-4 py-2 text-xl font-semibold text-gray-700"
-                          , runOn DL.click $ quantity <#> \q -> if (q > 1) then setQuantity (q - 1) else mempty
-                          ]
-                          [ text_ "-" ]
-                      , D.span [ DA.klass_ "px-4 py-2 text-lg font-semibold text-gray-900" ]
-                          [ text $ show <$> quantity ]
-                      , D.button
-                          [ DA.klass_ "px-4 py-2 text-xl font-semibold text-gray-700"
-                          , runOn DL.click $ quantity <#> \q -> setQuantity (q + 1)
-                          ]
-                          [ text_ "+" ]
-                      ]
-                  , D.div [ DA.klass_ "grow" ]
-                      [ IB.ionButton
-                          [ IB.color_ E.dark
-                          , IB.expand_ E.buttonexpandBlock
-                          , runOn DL.click $ ({ q: _, c: _, m: _ } <$> quantity <*> cart <*> modalElt) <#>
-                              \{ q, c: Cart { items }, m } -> do
-                                setCart $ Cart
-                                  { items:
-                                      replicate q
-                                        ( CartItem
-                                            { kitchenId
-                                            , kitchenName
-                                            , kitchenHeaderUrl: headerUrl
-                                            , menuId
-                                            , sectionId
-                                            , itemId
-                                            , imageUrl
-                                            , title
-                                            , description
-                                            , price
-                                            }
-                                        ) <> items
-                                  }
-                                for_ m \m' -> IM.dismiss m' (write {}) "add-to-cart"
-                          ]
-                          [ text_ "Add to order"
-                          ]
-                      ]
-                  ]
-            ]
-    ]
+  mempty
+  -- IM.ionModal
+  --   [ IM.initialBreakpoint_ 0.90
+  --   , IM.trigger_ $ modalId kitchenId sectionId menuId itemId
+  --   , Self.selfT_ \m -> do
+  --       IM.breakpoints m [ 0.0, 0.9 ]
+  --       setModalElt (Just m)
+  --   ]
+  --   [ item #
+  --       \( ModalItem
+  --            { title, description, imageUrl, headerUrl, kitchenName, price, kitchenId, menuId, sectionId, itemId }
+  --        ) ->
+  --         D.div [ DA.klass_ "flex flex-col h-[90%]" ]
+  --           [ D.div_
+  --               [ imageUrl # maybe mempty \url -> D.img
+  --                   [ DA.src_ url
+  --                   , DA.alt_ title
+  --                   , DA.klass_ "w-full"
+  --                   ]
+  --                   []
+  --               ]
+  --           , D.div [ DA.klass_ "p-4 grow overflow-y-scroll" ]
+  --               [ D.img
+  --                   [ DA.src_ headerUrl
+  --                   , DA.alt_ title
+  --                   , DA.klass_ "w-1/4"
+  --                   ]
+  --                   []
+  --               , D.h1
+  --                   [ DA.klass_ "text-2xl font-bold mt-4" ]
+  --                   [ text_ title ]
+  --               , D.div [ DA.klass_ "mt-4 text-red-500 font-semibold" ]
+  --                   [ text_
+  --                       ( "€" <> NF.toStringWith (NF.fixed 2)
+  --                           ( toNumber (description # maybe 600 \d -> if String.length d > 30 then 1350 else 600) /
+  --                               100.0
+  --                           )
+  --                       )
+  --                   ]
+  --               , description # maybe mempty \d -> D.p
+  --                   [ DA.klass_ "text-lg text-gray-500 mt-4" ]
+  --                   [ text_ d ]
+  --               ]
+  --           , Deku.do
+  --               setQuantity /\ quantity <- useState 1
+  --               D.div [ DA.klass_ "flex space-x-2 w-full p-4 bg-white" ]
+  --                 [ D.div
+  --                     [ DA.klass_ "flex items-center justify-center border-2 border-gray-300 rounded-md w-1/3"
+  --                     ]
+  --                     [ D.button
+  --                         [ DA.klass_ "px-4 py-2 text-xl font-semibold text-gray-700"
+  --                         , runOn DL.click $ quantity <#> \q -> if (q > 1) then setQuantity (q - 1) else mempty
+  --                         ]
+  --                         [ text_ "-" ]
+  --                     , D.span [ DA.klass_ "px-4 py-2 text-lg font-semibold text-gray-900" ]
+  --                         [ text $ show <$> quantity ]
+  --                     , D.button
+  --                         [ DA.klass_ "px-4 py-2 text-xl font-semibold text-gray-700"
+  --                         , runOn DL.click $ quantity <#> \q -> setQuantity (q + 1)
+  --                         ]
+  --                         [ text_ "+" ]
+  --                     ]
+  --                 , D.div [ DA.klass_ "grow" ]
+  --                     [ IB.ionButton
+  --                         [ IB.color_ E.dark
+  --                         , IB.expand_ E.buttonexpandBlock
+  --                         , runOn DL.click $ ({ q: _, c: _, m: _ } <$> quantity <*> cart <*> modalElt) <#>
+  --                             \{ q, c: Cart { items }, m } -> do
+  --                               setCart $ Cart
+  --                                 { items:
+  --                                     replicate q
+  --                                       ( CartItem
+  --                                           { kitchenId
+  --                                           , kitchenName
+  --                                           , kitchenHeaderUrl: headerUrl
+  --                                           , menuId
+  --                                           , sectionId
+  --                                           , itemId
+  --                                           , imageUrl
+  --                                           , title
+  --                                           , description
+  --                                           , price
+  --                                           }
+  --                                       ) <> items
+  --                                 }
+  --                               for_ m \m' -> IM.dismiss m' (write {}) "add-to-cart"
+  --                         ]
+  --                         [ text_ "Add to order"
+  --                         ]
+  --                     ]
+  --                 ]
+  --           ]
+  --   ]

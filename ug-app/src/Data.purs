@@ -3,10 +3,14 @@ module Data where
 import Prelude
 
 import Assets.Image as Image
+import Data.Array as Array
 import Data.Array.NonEmpty as NAE
 import Data.Either (Either(..))
+import Data.Function (on)
 import Data.Maybe (Maybe(..))
+import Data.Newtype (unwrap)
 import Data.NonEmpty as NE
+import Data.Tuple (Tuple(..))
 
 newtype Kitchen' a = Kitchen
   { id :: Int
@@ -28,7 +32,7 @@ newtype Menu' a = Menu
 type Menu = Menu' Section
 type Kitchen = Kitchen' Menu
 
-type FlatMenu = Menu' (Either Section Item)
+type FlatMenu = Menu' (Either Section (Tuple Int Item))
 type FlatKitchen = Kitchen' FlatMenu
 
 newtype Section = Section
@@ -4181,5 +4185,8 @@ Tofu, cauliflower, and fresh coriander in onion, ginger, and tomato sauce"""
 flatKitchens :: NAE.NonEmptyArray FlatKitchen
 flatKitchens = kitchens <#> \(Kitchen k) -> Kitchen $ k
   { menus = k.menus <#> \(Menu m) -> Menu $ m
-      { sections = join $ map (\(Section s) -> [ Left $ Section s ] <> map Right s.items) m.sections }
+      { sections = join $ map
+          (\(Section s) -> [ Left $ Section s ] <> map (Right <<< Tuple s.id) (Array.nubBy (compare `on` (\(Item i) -> i.title)) s.items))
+          m.sections
+      }
   }
