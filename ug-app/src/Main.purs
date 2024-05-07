@@ -14,4 +14,5 @@ main :: Effect Unit
 main = do
   _ /\ setCart /\ cart <- useHot $ Cart { items: [ ] }
   _ /\ setRouter /\ router <- useHot Nothing
-  app { setCart, cart, setRouter, router } >>= runInBody
+  setRouteChanged /\ routeChanged <- useState'
+  app { setCart, cart, setRouter, router, routeChanged, setRouteChanged } >>= runInBody

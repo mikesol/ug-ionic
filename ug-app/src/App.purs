@@ -20,6 +20,8 @@ app :: _ -> Effect Nut
 app polls = do
   rtr <- IR.ionRouter
     [ IR.useHash_ false
+    , IR.ionRouteDidChange_ \_ -> do
+        polls.setRouteChanged unit
     , Self.selfT_ \(r :: IR.IonRouter) -> do
         polls.setRouter (Just r)
     ]

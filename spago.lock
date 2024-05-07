@@ -606,7 +606,7 @@ workspace:
         - web-touchevents
     deku-ionic:
       git: https://github.com/mikesol/purescript-deku-ionic.git
-      ref: 6535b81
+      ref: a0bab4d
       subdir: deku-ionic
     hyrule:
       repo: https://github.com/mikesol/purescript-hyrule.git
@@ -801,7 +801,7 @@ packages:
   deku-ionic:
     type: git
     url: https://github.com/mikesol/purescript-deku-ionic.git
-    rev: 6535b8140dc6fc62aa6cdb92089f721a88d8b62d
+    rev: a0bab4d7ad74442c38eb5c4588fb5beb603e13de
     subdir: deku-ionic
     dependencies:
       - aff-promise
