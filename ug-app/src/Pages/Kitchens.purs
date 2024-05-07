@@ -7,6 +7,7 @@ import Assets.SVG as SVG
 import Cart (Cart(..), CartItem(..))
 import Components.Swiper (Swiper, activeIndex, onEvent, slideTo, swiper)
 import Components.Swiper as Swiper
+import Control.Promise (toAffE)
 import Data as Data
 import Data.Array (drop, fold, length, replicate, take, (..))
 import Data.Array as Array
@@ -24,7 +25,7 @@ import Data.Options ((:=))
 import Data.String as String
 import Data.Tuple (Tuple(..))
 import Data.Tuple.Nested ((/\))
-import Deku.Core (Nut, fixed, text, text_, useHot, useRant, useState, useState')
+import Deku.Core (Nut, fixed, text, text_, useHot, useMailboxed, useRant, useState, useState')
 import Deku.DOM as D
 import Deku.DOM.Attributes as DA
 import Deku.DOM.Listeners (runOn, runOn_)
@@ -42,6 +43,8 @@ import Deku.Ionic.Footer as IF
 import Deku.Ionic.Header as IH
 import Deku.Ionic.Icon as IIc
 import Deku.Ionic.Img as IMG
+import Deku.Ionic.InfiniteScroll as IIS
+import Deku.Ionic.InfiniteScrollContent as IISL
 import Deku.Ionic.Modal as IM
 import Deku.Ionic.Router as IR
 import Deku.Ionic.Select as IS
@@ -49,7 +52,8 @@ import Deku.Ionic.SelectOption as ISO
 import Deku.Ionic.Title as ITi
 import Deku.Ionic.Toolbar as IT
 import Effect (Effect)
-import Effect.Console (logShow)
+import Effect.Aff (launchAff_)
+import Effect.Console (log, logShow)
 import FRP.Event as Event
 import FRP.Poll (Poll)
 import Untagged.Union (asOneOf)
@@ -85,7 +89,7 @@ dietaryInfoToString LactoseFree = "LF"
 dietaryInfoToString GlutenFree = "GF"
 
 kitchens :: _ -> _
-kitchens { cart, setCart, routeChanged } = IR.ionRoute_ @{ kitchen :: Int } \{ checkout } { kitchen } -> Deku.do
+kitchens { cart, setCart } = IR.ionRoute_ @{ kitchen :: Int } \{ checkout } { kitchen } -> Deku.do
   setMainSlider /\ mainSlider <- useState'
   fixed
     [ IH.ionHeader_
@@ -113,7 +117,7 @@ kitchens { cart, setCart, routeChanged } = IR.ionRoute_ @{ kitchen :: Int } \{ c
             ]
 
         ]
-    , IC.ionContent_ [ swiperComponent { cart, setCart, routeChanged } ]
+    , IC.ionContent_ [ swiperComponent { cart, setCart } ]
     , IF.ionFooter
         [ IF.translucent_ true
         , Self.self_ \_ -> do
@@ -165,13 +169,13 @@ kitchens { cart, setCart, routeChanged } = IR.ionRoute_ @{ kitchen :: Int } \{ c
     ]
 
 swiperComponent :: _ -> Nut
-swiperComponent { cart, setCart, routeChanged } =
+swiperComponent { cart, setCart } =
   D.div [ DA.klass_ "w-full h-full" ]
     [ D.div
         [ DA.klass_ "swiper mainSwiper w-full h-full" ]
         [ D.div
             [ DA.klass_ "swiper-wrapper" ]
-            (NAE.toArray $ map (mainSlide { cart, setCart, routeChanged }) Data.kitchens)
+            (NAE.toArray $ map (mainSlide { cart, setCart }) Data.kitchens)
         ]
     ]
 
@@ -198,7 +202,7 @@ topSlide ps n (Data.Kitchen { headerUrl }) =
     ]
 
 mainSlide :: _ -> Data.Kitchen -> Nut
-mainSlide { cart, setCart, routeChanged } k = Deku.do
+mainSlide { cart, setCart } k = Deku.do
   let Data.Kitchen kitchen = k
   setMenuIndex /\ menuIndex <- useState 0
   setMenuHeaderMap /\ menuHeaderMapElts <- useState Nothing
@@ -273,17 +277,14 @@ mainSlide { cart, setCart, routeChanged } k = Deku.do
             , menuId
             , cart
             , setCart
-            , routeChanged
             }
         D.div
           [ DA.klass_ "px-4 mt-4" ]
-          ( (map (rc true) (take 1 sections)) <>
-              [ routeChanged <#~> \_ -> fixed (map (rc false) (drop 1 sections))
-              ]
-          )
+          (join $ map rc sections)
+
     ]
 
-renderCategory :: _ -> Boolean -> Data.Section -> Nut
+renderCategory :: _ -> Data.Section -> Array Nut
 renderCategory
   { setMenuHeaderMap
   , headerUrl
@@ -292,9 +293,7 @@ renderCategory
   , kitchenName
   , cart
   , setCart
-  , routeChanged
   }
-  isFirst
   (Data.Section { id, title, description, items }) = do
   let source = Array.nubBy (compare `on` (unwrap >>> _.title)) $ resolveItems items
   let
@@ -307,8 +306,7 @@ renderCategory
       , cart
       , setCart
       }
-  D.div_
-    ( [ D.div
+  [ D.div
           [ DA.klass_ "sticky top-0 bg-white"
           , Self.self_ \e -> do
               setMenuHeaderMap (Just (Tuple id e))
@@ -321,14 +319,7 @@ renderCategory
               [ text_ d ]
           ]
       -- the data source has lots of duplicates, so nub them
-      ] <>
-        if not isFirst then map ri source
-        else
-          ( (map ri (take 3 source)) <>
-              [ routeChanged <#~> \_ -> fixed (map ri (drop 3 source))
-              ]
-          )
-    )
+      ] <> map ri source
 
 resolveItems :: Array Data.Item -> Array MenuItemResolved
 resolveItems = compact <<< map resolveItem

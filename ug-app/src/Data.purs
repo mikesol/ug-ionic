@@ -4,25 +4,32 @@ import Prelude
 
 import Assets.Image as Image
 import Data.Array.NonEmpty as NAE
+import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Data.NonEmpty as NE
 
-newtype Kitchen = Kitchen
+newtype Kitchen' a = Kitchen
   { id :: Int
   , name :: String
   , description :: String
   , slug :: String
   , imageUrl :: String
   , headerUrl :: String
-  , menus :: Array Menu
+  , menus :: Array a
   }
 
-newtype Menu = Menu
+newtype Menu' a = Menu
   { id :: Int
   , title :: String
   , description :: Maybe String
-  , sections :: Array Section
+  , sections :: Array a
   }
+
+type Menu = Menu' Section
+type Kitchen = Kitchen' Menu
+
+type FlatMenu = Menu' (Either Section Item)
+type FlatKitchen = Kitchen' FlatMenu
 
 newtype Section = Section
   { id :: Int
@@ -4170,3 +4177,9 @@ Tofu, cauliflower, and fresh coriander in onion, ginger, and tomato sauce"""
             ]
         }
     ]
+
+flatKitchens :: NAE.NonEmptyArray FlatKitchen
+flatKitchens = kitchens <#> \(Kitchen k) -> Kitchen $ k
+  { menus = k.menus <#> \(Menu m) -> Menu $ m
+      { sections = join $ map (\(Section s) -> [ Left $ Section s ] <> map Right s.items) m.sections }
+  }
