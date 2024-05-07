@@ -4,15 +4,17 @@ import Prelude
 
 import App (app)
 import Cart (Cart(..))
+import Control.Monad.ST.Class (liftST)
 import Data.Maybe (Maybe(..))
 import Data.Tuple.Nested ((/\))
 import Deku.Effect (useHot, useState')
 import Deku.Toplevel (runInBody)
 import Effect (Effect)
+import FRP.Event (create)
 
 main :: Effect Unit
 main = do
   _ /\ setCart /\ cart <- useHot $ Cart { items: [ ] }
   _ /\ setRouter /\ router <- useHot Nothing
-  setRouteChanged /\ routeChanged <- useState'
-  app { setCart, cart, setRouter, router, routeChanged, setRouteChanged } >>= runInBody
+  { event: currentKitchen, push: setCurrentKitchen } <- liftST create
+  app { setCart, cart, setRouter, router, currentKitchen, setCurrentKitchen } >>= runInBody

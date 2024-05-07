@@ -14,6 +14,7 @@ import Data.Number.Format as NF
 import Deku.Core (fixed, text, text_)
 import Deku.DOM as D
 import Deku.DOM.Attributes as DA
+import Deku.DOM.Listeners as DL
 import Deku.Ionic.Badge as IBa
 import Deku.Ionic.Button as IB
 import Deku.Ionic.Buttons as IBs
@@ -31,6 +32,8 @@ import Deku.Ionic.List as IL
 import Deku.Ionic.Note as IN
 import Deku.Ionic.Router as IR
 import Deku.Ionic.Toolbar as IT
+import Effect (Effect)
+import Effect.Console (log)
 import FRP.Poll (Poll)
 
 newtype KitchenGridEntry = KitchenGridEntry
@@ -40,7 +43,7 @@ newtype KitchenGridEntry = KitchenGridEntry
   }
 
 intro :: _ -> _
-intro { cart } = IR.ionRoute_ @{} \{ kitchens, checkout } _ -> fixed
+intro { cart, setCurrentKitchen } = IR.ionRoute_ @{} \{ kitchens, checkout } _ -> fixed
   [ IH.ionHeader_
       [ IT.ionToolbar [ IT.color_ $ E.customColor "ugmain" ]
           [ IBs.ionButtons [ IBs.slot_ "secondary" ]
@@ -104,7 +107,10 @@ intro { cart } = IR.ionRoute_ @{} \{ kitchens, checkout } _ -> fixed
           $ NAE.toArray
               ( mapWithIndex
                   ( \kitchen (Data.Kitchen { slug, name, imageUrl }) -> D.div_
-                      [ kitchens (pure { kitchen } :: Poll _) []
+                      [ kitchens (pure {} :: Poll _) [ 
+                        DL.click_ (\_ -> do
+                                        log "clicked"
+                                        setCurrentKitchen kitchen) :: Poll _ ]
                           [ D.img
                               [ DA.src_ imageUrl
                               , DA.alt_ name

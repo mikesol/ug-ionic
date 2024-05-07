@@ -50,7 +50,10 @@ import Deku.Ionic.Title as ITi
 import Deku.Ionic.Toolbar as IT
 import Effect (Effect)
 import Effect.Console (logShow)
+import Effect.Timer (setTimeout)
+import FRP.Event (subscribe)
 import FRP.Event as Event
+import FRP.Event.Class (once)
 import FRP.Poll (Poll)
 import Untagged.Union (asOneOf)
 import Web.CSSOMView (ScrollBehavior(..), ScrollLogicalPosition(..))
@@ -85,7 +88,7 @@ dietaryInfoToString LactoseFree = "LF"
 dietaryInfoToString GlutenFree = "GF"
 
 kitchens :: _ -> _
-kitchens { cart, setCart, routeChanged } = IR.ionRoute_ @{ kitchen :: Int } \{ checkout } { kitchen } -> Deku.do
+kitchens { cart, setCart, currentKitchen } = IR.ionRouteEager_ \{ checkout } -> Deku.do
   setMainSlider /\ mainSlider <- useState'
   fixed
     [ IH.ionHeader_
@@ -113,16 +116,16 @@ kitchens { cart, setCart, routeChanged } = IR.ionRoute_ @{ kitchen :: Int } \{ c
             ]
 
         ]
-    , IC.ionContent_ [ swiperComponent { cart, setCart, routeChanged } ]
+    , IC.ionContent_ [ swiperComponent { cart, setCart } ]
     , IF.ionFooter
         [ IF.translucent_ true
         , Self.self_ \_ -> do
             ts <- swiper "topSwiper" $
               Swiper.slidesPerView := asOneOf "auto"
                 <> Swiper.centeredSlides := true
-                <> Swiper.initialSlide := kitchen
+                <> Swiper.initialSlide := 0
             ms <- swiper "mainSwiper" $
-              Swiper.initialSlide := kitchen
+              Swiper.initialSlide := 0
             _ <- onEvent ms "slideChange" do
               msai <- activeIndex ms
               tsai <- activeIndex ts
@@ -133,6 +136,8 @@ kitchens { cart, setCart, routeChanged } = IR.ionRoute_ @{ kitchen :: Int } \{ c
               tsai <- activeIndex ts
               when (tsai /= msai) do
                 slideTo ms tsai
+            _ <- subscribe currentKitchen \s -> do
+                void $ setTimeout 1000 (slideTo ms s)
             setMainSlider ms
         ]
         [ IT.ionToolbar_
@@ -165,13 +170,13 @@ kitchens { cart, setCart, routeChanged } = IR.ionRoute_ @{ kitchen :: Int } \{ c
     ]
 
 swiperComponent :: _ -> Nut
-swiperComponent { cart, setCart, routeChanged } =
+swiperComponent { cart, setCart } =
   D.div [ DA.klass_ "w-full h-full" ]
     [ D.div
         [ DA.klass_ "swiper mainSwiper w-full h-full" ]
         [ D.div
             [ DA.klass_ "swiper-wrapper" ]
-            (NAE.toArray $ map (mainSlide { cart, setCart, routeChanged }) Data.kitchens)
+            (NAE.toArray $ map (mainSlide { cart, setCart }) Data.kitchens)
         ]
     ]
 
@@ -198,7 +203,7 @@ topSlide ps n (Data.Kitchen { headerUrl }) =
     ]
 
 mainSlide :: _ -> Data.Kitchen -> Nut
-mainSlide { cart, setCart, routeChanged } k = Deku.do
+mainSlide { cart, setCart } k = Deku.do
   let Data.Kitchen kitchen = k
   setMenuIndex /\ menuIndex <- useState 0
   setMenuHeaderMap /\ menuHeaderMapElts <- useState Nothing
@@ -273,17 +278,15 @@ mainSlide { cart, setCart, routeChanged } k = Deku.do
             , menuId
             , cart
             , setCart
-            , routeChanged
+            
             }
         D.div
           [ DA.klass_ "px-4 mt-4" ]
-          ( (map (rc true) (take 1 sections)) <>
-              [ routeChanged <#~> \_ -> fixed (map (rc false) (drop 1 sections))
-              ]
-          )
+          (map rc sections)
+
     ]
 
-renderCategory :: _ -> Boolean -> Data.Section -> Nut
+renderCategory :: _ -> Data.Section -> Nut
 renderCategory
   { setMenuHeaderMap
   , headerUrl
@@ -292,9 +295,8 @@ renderCategory
   , kitchenName
   , cart
   , setCart
-  , routeChanged
+  
   }
-  isFirst
   (Data.Section { id, title, description, items }) = do
   let source = Array.nubBy (compare `on` (unwrap >>> _.title)) $ resolveItems items
   let
@@ -321,13 +323,7 @@ renderCategory
               [ text_ d ]
           ]
       -- the data source has lots of duplicates, so nub them
-      ] <>
-        if not isFirst then map ri source
-        else
-          ( (map ri (take 3 source)) <>
-              [ routeChanged <#~> \_ -> fixed (map ri (drop 3 source))
-              ]
-          )
+      ] <> map ri source
     )
 
 resolveItems :: Array Data.Item -> Array MenuItemResolved
