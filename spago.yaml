@@ -42,4 +42,4 @@ workspace:
     deku-ionic:
       git: "https://github.com/mikesol/purescript-deku-ionic.git"
       subdir: deku-ionic
-      ref: "6535b81"
+      ref: "664f22c"

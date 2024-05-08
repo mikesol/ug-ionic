@@ -26,6 +26,6 @@
   "dependencies": {
     "@capacitor/android": "^6.0.0",
     "@capacitor/ios": "^6.0.0",
-    "virtual-scroller": "^1.12.6"
+    "swiper": "^11.1.1"
   }
 }

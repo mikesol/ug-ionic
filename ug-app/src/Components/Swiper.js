@@ -1,3 +1,5 @@
+import Swiper from 'swiper';
+
 export const swiperImpl = (className) => (opts) => () =>
   new Swiper(`.${className}`, opts);
 
