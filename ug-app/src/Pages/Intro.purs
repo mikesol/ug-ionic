@@ -107,10 +107,7 @@ intro { cart, setCurrentKitchen } = IR.ionRoute_ @{} \{ kitchens, checkout } _ -
           $ NAE.toArray
               ( mapWithIndex
                   ( \kitchen (Data.Kitchen { slug, name, imageUrl }) -> D.div_
-                      [ kitchens (pure {} :: Poll _) [ 
-                        DL.click_ (\_ -> do
-                                        log "clicked"
-                                        setCurrentKitchen kitchen) :: Poll _ ]
+                      [ kitchens (pure {} :: Poll _) [ DL.click_ (\_ -> setCurrentKitchen kitchen) :: Poll _ ]
                           [ D.img
                               [ DA.src_ imageUrl
                               , DA.alt_ name

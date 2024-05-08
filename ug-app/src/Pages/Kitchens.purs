@@ -136,8 +136,7 @@ kitchens { cart, setCart, currentKitchen } = IR.ionRouteEager_ \{ checkout } -> 
               tsai <- activeIndex ts
               when (tsai /= msai) do
                 slideTo ms tsai
-            _ <- subscribe currentKitchen \s -> do
-                void $ setTimeout 1000 (slideTo ms s)
+            _ <- subscribe currentKitchen (slideTo ms)
             setMainSlider ms
         ]
         [ IT.ionToolbar_
